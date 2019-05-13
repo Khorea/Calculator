@@ -1,0 +1,779 @@
+.386
+.model flat, stdcall
+
+includelib msvcrt.lib
+extern exit: proc
+extern scanf: proc
+extern sscanf: proc
+extern printf: proc
+
+public start
+
+.data
+
+ISTRING		DB 1000 DUP(0), 0
+STRFORMAT	DB "%s", 0
+PLUS		DB 43
+OPERATORI	DB 500  DUP(0), 0
+OPERANZI	DQ 500  DUP(0), 0
+ERRORMSG	DB 10, "Expresie invalida!", 10, 10, 0
+STARTMSG	DB "Introduce-ti o expresie aritmetica valida:", 10, 10, 0
+FORMAT		DB 10, "Rezultatul este: %lf", 10, 10, 0
+HELP		DB "Tastati ", '"', "HELP", '"', " pentru a vizualiza ghidul de utilizare :-)", 10, 10, 0
+GHID		DB 10, "Acesta este un calculator de buzunar care poate evalua o expresie aritmetica cu numere reale.", 10, 10
+GHID2		DB "Operatiile admise sunt: ", 10, "-Adunarea(+)", 10, "-Scaderea(-)", 10, "-Inmultirea(*)", 10, "-Impartirea(/)", 10, 10
+GHID3		DB "Calculatorul poate evalua si functiile sinus(SIN) si logaritm(LOG) in baza 2.", 10, "Argumentul acestora trebuie scris in paranteze.", 10, 10, "Pentru a folosi rezultatul anterior in expresia curenta, aceasta trebuie sa inceapa cu un operator.", 10, "Este admis un singur nivel de paranteze.", 10, "Semnul = trebuie sa fie prezent pentru a indica sfarsitul expresiei.", 10, 10
+GHID4		DB "Cuvinte cheie:", 10, 10, "-EXIT: Cauzeaza parasirea programului", 10, "-HELP: Deschide ghidul de utilizare", 10, "-SIN:  Efectueaza evaluarea functiei sin"
+GHID5		DB 10, "-LOG:  Efectueaza evaluarea functiei log in baza 2", 10, "-PI:   Valoarea pi(3,14159...)", 10, 10, "Exemplu: SIN(PI/2)+1-LOG(8)/3+3.5*2=", 10, 10, 0
+TEMP		DD 0
+TEMP2		DQ 0.0
+ZERO		DQ 48.0
+ZECE		DQ 10.0
+REZ			DQ 0.0
+P 			DQ 10.0
+N		    DD 0
+
+SBOOLEAN	DB 0
+LBOOLEAN	DB 0
+PLUS2		DB 43
+OPERATORI2	DB 500 DUP(0), 0 
+OPERANZI2	DQ 500 DUP(0), 0
+ECXX		DD 0
+EBXX		DD 0
+EDXX		DD 0
+N2			DD 0
+
+.code
+
+; Functii pentru adunare, scadere, inmultire, impartire
+ADUNA PROC 
+	PUSH EBP
+	MOV EBP, ESP
+	
+	finit
+	fld 	QWORD PTR [EBP+8]
+	fld 	QWORD PTR [EBP+16]
+	fadd
+	fstp 	REZ
+	
+	MOV ESP, EBP
+	POP EBP
+	RET
+ADUNA ENDP
+
+SCADE PROC 
+	PUSH EBP
+	MOV EBP, ESP
+	
+	finit
+	fld 	QWORD PTR [EBP+8]
+	fld 	QWORD PTR [EBP+16]
+	fsub
+	fstp 	REZ
+	
+	MOV ESP, EBP
+	POP EBP
+	RET
+SCADE ENDP
+
+INMULTESTE PROC 
+	PUSH EBP
+	MOV EBP, ESP
+	
+	finit
+	fld 	QWORD PTR [EBP+8]
+	fld 	QWORD PTR [EBP+16]
+	fmul
+	fstp 	REZ
+	
+	MOV ESP, EBP
+	POP EBP
+	RET
+INMULTESTE ENDP
+
+IMPARTE PROC 
+	PUSH EBP
+	MOV EBP, ESP
+	
+	finit
+	fld 	QWORD PTR [EBP+8]
+	fld 	QWORD PTR [EBP+16]
+	fdiv
+	fstp 	REZ
+	
+	MOV ESP, EBP
+	POP EBP
+	RET
+IMPARTE ENDP
+
+; Functiile sin si log
+SIN PROC
+	PUSH EBP
+	MOV EBP, ESP
+	
+	finit
+	fld 	QWORD PTR [EBP+8]
+	fsin
+	fstp 	REZ
+	
+	MOV ESP, EBP
+	POP EBP
+	RET
+SIN ENDP
+
+LOG PROC
+	PUSH EBP
+	MOV EBP, ESP
+	
+	finit
+	fld1 	
+	fld 	QWORD PTR [EBP+8]
+	fyl2x
+	fstp 	REZ
+	
+	MOV ESP, EBP
+	POP EBP
+	RET
+LOG ENDP
+
+
+start:
+	PUSH OFFSET GHID
+	PUSH OFFSET STRFORMAT
+	CALL PRINTF
+
+	RESTART:
+	PUSH OFFSET STARTMSG
+	PUSH OFFSET STRFORMAT
+	CALL PRINTF
+	
+	PUSH OFFSET ISTRING
+	PUSH OFFSET STRFORMAT
+	CALL SCANF
+	
+	XOR EAX, EAX
+	MOV ECX, N
+	INC ECX
+	
+	
+	INIT:
+	MOV OPERATORI[ECX], AL
+	MOV DWORD PTR [OPERANZI+ECX*8], EAX
+	MOV DWORD PTR [OPERANZI+ECX*8+4], EAX
+	LOOP INIT
+	
+	MOV DWORD PTR [OPERANZI], EAX
+	MOV DWORD PTR [OPERANZI+4], EAX
+	
+	XOR EBX, EBX
+	XOR ECX, ECX
+	XOR EDX, EDX
+	
+	; Cazul in care se incepe cu operator
+	MOV AL, ISTRING[EBX]
+	CMP AL, '+'
+	JE OK
+	CMP AL, '-'
+	JE OK
+	CMP AL, '*'
+	JE OK
+	CMP AL, '/'
+	JE OK
+	JMP NEXT
+	OK:
+	MOV OPERATORI[ECX], AL
+	FLD REZ
+	FSTP OPERANZI
+	ADD EDX, 8
+	INC ECX
+	INC EBX
+	
+	
+	NEXT:
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	
+	; Verificare operator
+	CMP AL, '+'
+	JE OPERATOR
+	CMP AL, '-'
+	JE OPERATOR
+	CMP AL, '*'
+	JE OPERATOR
+	CMP AL, '/'
+	JNE NUMAR
+	OPERATOR:
+	MOV OPERATORI[ECX], AL
+	INC ECX
+	JMP NEXT
+	
+	
+	; Verificare numar
+	NUMAR:
+	CMP AL, '0'
+	JB EXT
+	CMP AL, '9'
+	JA EXT
+	
+	
+	; Crearea numarului
+	CREEAZA1:
+	MOV  TEMP, EAX
+	FINIT
+	FLD  ZERO
+	FILD TEMP
+	FSUBR
+	FSTP TEMP2
+	FLD  OPERANZI[EDX]
+	FLD  ZECE
+	FMUL
+	FLD  TEMP2
+	FADD
+	FSTP OPERANZI[EDX]
+	
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, '0'
+	JB PUNCT
+	CMP AL, '9'
+	JA PUNCT
+	JMP CREEAZA1
+	
+	
+	PUNCT:
+	CMP AL, '.'
+	JNE CREAT
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	
+	
+	CREEAZA2: 
+	MOV   TEMP, EAX
+	FINIT
+	FLD   ZERO
+	FILD  TEMP
+	FSUBR
+	FLD	  P
+	FDIV 
+	FLD   OPERANZI[EDX]
+	FADD
+	FSTP  OPERANZI[EDX]
+	FLD   P
+	FLD   ZECE
+	FMUL
+	FSTP  P
+	
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, '0'
+	JB CREAT
+	CMP AL, '9'
+	JA CREAT
+	JMP CREEAZA2
+	
+	
+	CREAT:
+	FLD  ZECE
+	FSTP P
+	ADD EDX, 8
+	DEC EBX
+	JMP NEXT
+	
+	
+	; Detectarea secventei EXIT
+	EXT:
+	CMP AL, 'E'
+	JNE HLP
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'X'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'I'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'T'
+	JNE INVALID
+	JMP DONE
+	
+	
+	; Detectarea secventei HELP
+	HLP:
+	CMP AL, 'H'
+	JNE PI
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'E'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'L'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'P'
+	JNE INVALID
+	PUSH OFFSET GHID
+	PUSH OFFSET STRFORMAT
+	CALL PRINTF
+	JMP RESTART
+	
+	
+	; Detectarea secventei PI
+	PI:
+	CMP AL, 'P'
+	JNE SINUS
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'I'
+	JNE INVALID
+	FINIT
+	FLDPI
+	FSTP OPERANZI[EDX]
+	ADD EDX, 8
+	JMP NEXT
+	
+	
+	; Detectarea secventei SIN
+	SINUS:
+	CMP AL, 'S'
+	JNE LOGARITM
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'I'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'N'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, '('
+	JNE INVALID
+	MOV AL, 1
+	MOV SBOOLEAN, AL
+	MOV AL, '('
+	JMP PARANTEZA
+	
+	
+	; Detectarea secventei LOG
+	LOGARITM:
+	CMP AL, 'L'
+	JNE PARANTEZA
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'O'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'G'
+	JNE INVALID
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, '('
+	JNE INVALID
+	MOV AL, 1
+	MOV LBOOLEAN, AL
+	MOV AL, '('
+	JMP PARANTEZA
+	
+	
+	; Evaluarea expr din paranteza
+	PARANTEZA:
+	CMP AL, '('
+	JNE EGAL
+	
+	MOV ECXX, ECX
+	MOV EDXX, EDX
+	XOR ECX, ECX
+	XOR EDX, EDX
+	
+	XOR EAX, EAX
+	MOV ECX, N2
+	INC ECX
+	
+	INIT2:
+	MOV OPERATORI2[ECX], AL
+	MOV DWORD PTR [OPERANZI2+ECX*8], EAX
+	MOV DWORD PTR [OPERANZI2+ECX*8+4], EAX
+	LOOP INIT2
+	
+	MOV DWORD PTR [OPERANZI2], EAX
+	MOV DWORD PTR [OPERANZI2+4], EAX
+	
+	MOV AL, ISTRING[EBX]
+	CMP AL, '-'
+	JNE PNEXT
+	MOV OPERATORI2, AL;
+	FLDZ
+	FSTP OPERANZI2
+	INC ECX
+	ADD EDX, 8;
+	
+	
+	PNEXT:
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	
+	CMP AL, '+'
+	JE POPERATOR
+	CMP AL, '-'
+	JE POPERATOR
+	CMP AL, '*'
+	JE POPERATOR
+	CMP AL, '/'
+	JNE PNUMAR
+	POPERATOR:
+	MOV OPERATORI2[ECX], AL
+	INC ECX
+	JMP PNEXT
+	
+	
+	PNUMAR:
+	CMP AL, '0'
+	JB PPI
+	CMP AL, '9'
+	JA PPI
+	
+	
+	PCREEAZA1:
+	MOV  TEMP, EAX
+	FINIT
+	FLD  ZERO
+	FILD TEMP
+	FSUBR
+	FSTP TEMP2
+	FLD  OPERANZI2[EDX]
+	FLD  ZECE
+	FMUL
+	FLD  TEMP2
+	FADD
+	FSTP OPERANZI2[EDX]
+	
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, '0'
+	JB PPUNCT
+	CMP AL, '9'
+	JA PPUNCT
+	JMP PCREEAZA1
+	
+	
+	PPUNCT:
+	CMP AL, '.'
+	JNE PCREAT
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	
+	
+	PCREEAZA2: 
+	MOV   TEMP, EAX
+	FINIT
+	FLD   ZERO
+	FILD  TEMP
+	FSUBR
+	FLD	  P
+	FDIV 
+	FLD   OPERANZI2[EDX]
+	FADD
+	FSTP  OPERANZI2[EDX]
+	FLD   P
+	FLD   ZECE
+	FMUL
+	FSTP  P
+	
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, '0'
+	JB PCREAT
+	CMP AL, '9'
+	JA PCREAT
+	JMP PCREEAZA2
+	
+	
+	PCREAT:
+	FLD  ZECE
+	FSTP P
+	ADD EDX, 8
+	DEC EBX
+	JMP PNEXT
+	
+	
+	PPI:
+	CMP AL, 'P'
+	JNE PARANTEZA2
+	MOV AL, ISTRING[EBX]
+	INC EBX
+	CMP AL, 'I'
+	JNE INVALID
+	FINIT
+	FLDPI
+	FSTP OPERANZI2[EDX]
+	ADD EDX, 8
+	JMP PNEXT
+	
+	
+	PARANTEZA2:
+	CMP AL, ')'
+	JNE INVALID
+	
+	
+	PEVALUEAZA:
+	MOV N2, ECX
+	MOV EBXX, EBX
+	
+	
+	PSTEP1:
+	XOR EAX, EAX
+	XOR EBX, EBX
+	XOR ECX, ECX
+	XOR EDX, EDX
+	DEC EBX
+	SUB EDX, 8
+	
+	
+	PET1:
+	INC EBX
+	ADD EDX, 8
+	mov AL, '*'
+	cmp	OPERATORI2[EBX], AL
+	JNE PIMPARTIRE
+	push DWORD PTR [OPERANZI2+EDX+12]
+	push DWORD PTR [OPERANZI2+EDX+8]
+	push DWORD PTR [OPERANZI2+EDX+4]
+	push DWORD PTR [OPERANZI2+EDX]
+	call INMULTESTE
+	FLD  REZ
+	FSTP QWORD PTR [OPERANZI2+EDX+8]
+	FLDZ  
+	FSTP QWORD PTR [OPERANZI2+EDX]
+	MOV CL, OPERATORI2[EBX-1]
+	MOV OPERATORI2[EBX], CL
+	jmp  PET1
+	
+	
+	PIMPARTIRE:
+	mov AL, '/'
+	cmp	OPERATORI2[EBX], AL
+	JNE PEOO
+	push DWORD PTR [OPERANZI2+EDX+12]
+	push DWORD PTR [OPERANZI2+EDX+8]
+	push DWORD PTR [OPERANZI2+EDX+4]
+	push DWORD PTR [OPERANZI2+EDX]
+	call IMPARTE 
+	FLD  REZ
+	FSTP QWORD PTR [OPERANZI2+EDX+8]
+	FLDZ  
+	FSTP QWORD PTR [OPERANZI2+EDX]
+	MOV CL, OPERATORI2[EBX-1]
+	MOV OPERATORI2[EBX], CL
+	JMP PET1
+	
+	
+	PEOO:
+	mov AL, 0
+	cmp	OPERATORI2[EBX], AL
+	JNE PET1
+	
+	
+	PSTEP2:	
+	XOR EAX, EAX
+	XOR EBX, EBX
+	XOR ECX, ECX
+	XOR EDX, EDX
+	
+	
+	PET2:
+	ADD EDX, 8
+	
+	MOV AL, '+'
+	CMP	OPERATORI2[EBX], AL
+	JNE PSCADERE
+	PUSH DWORD PTR [OPERANZI2+EDX+4]
+	PUSH DWORD PTR [OPERANZI2+EDX]
+	PUSH DWORD PTR [OPERANZI2+4]
+	PUSH DWORD PTR [OPERANZI2]
+	CALL ADUNA
+	FLD  REZ
+	FSTP OPERANZI2
+	INC  EBX
+	JMP  PET2
+	
+	
+	PSCADERE:
+	MOV AL, '-'
+	CMP	OPERATORI2[EBX], AL
+	JNE PGATA
+	PUSH DWORD PTR [OPERANZI2+EDX+4]
+	PUSH DWORD PTR [OPERANZI2+EDX]
+	PUSH DWORD PTR [OPERANZI2+4]
+	PUSH DWORD PTR [OPERANZI2]
+	CALL SCADE 
+	FLD  REZ
+	FSTP OPERANZI2
+	INC EBX
+	JMP  PET2
+	
+	
+	PGATA:
+	MOV ECX, ECXX
+	MOV EBX, EBXX
+	MOV EDX, EDXX
+	FLD OPERANZI2
+	MOV AL, SBOOLEAN
+	CMP AL, 1
+	JNE L
+	FSIN
+	FSTP OPERANZI[EDX]
+	ADD EDX, 8
+	MOV AL, 0
+	MOV SBOOLEAN, AL
+	JMP NEXT
+	L:
+	MOV AL, LBOOLEAN
+	CMP AL, 1
+	JNE PET3
+	FLD1
+	FLD OPERANZI2
+	FYL2X
+	FSTP OPERANZI[EDX]
+	ADD EDX, 8
+	MOV AL, 0
+	MOV LBOOLEAN, AL
+	JMP NEXT
+	PET3:
+	FSTP OPERANZI[EDX]
+	ADD EDX, 8
+	JMP NEXT
+	
+	
+	EGAL:
+	CMP AL, '='
+	JE EVALUEAZA
+	
+	
+	INVALID:
+	PUSH OFFSET ERRORMSG
+	PUSH OFFSET STRFORMAT
+	CALL PRINTF	
+	JMP RESTART
+	
+	
+	; Evaluarea expresiei finale
+	EVALUEAZA:
+	MOV N, ECX
+	
+	
+	; Se parcurge sirul de operatori si operanzi pentru evaluarea inmultirilor si impartirilor
+	STEP1:
+	XOR EAX, EAX
+	XOR EBX, EBX
+	XOR ECX, ECX
+	XOR EDX, EDX
+	DEC EBX
+	SUB EDX, 8
+	
+	
+	ET1:
+	INC EBX
+	ADD EDX, 8
+	mov AL, '*'
+	cmp	OPERATORI[EBX], AL
+	JNE IMPARTIRE
+	push DWORD PTR [OPERANZI+EDX+12]
+	push DWORD PTR [OPERANZI+EDX+8]
+	push DWORD PTR [OPERANZI+EDX+4]
+	push DWORD PTR [OPERANZI+EDX]
+	call INMULTESTE
+	FLD  REZ
+	FSTP QWORD PTR [OPERANZI+EDX+8]
+	FLDZ  
+	FSTP QWORD PTR [OPERANZI+EDX]
+	MOV CL, OPERATORI[EBX-1]
+	MOV OPERATORI[EBX], CL
+	jmp  ET1
+	
+	
+	IMPARTIRE:
+	mov AL, '/'
+	cmp	OPERATORI[EBX], AL
+	JNE EOO
+	push DWORD PTR [OPERANZI+EDX+12]
+	push DWORD PTR [OPERANZI+EDX+8]
+	push DWORD PTR [OPERANZI+EDX+4]
+	push DWORD PTR [OPERANZI+EDX]
+	call IMPARTE 
+	FLD  REZ
+	FSTP QWORD PTR [OPERANZI+EDX+8]
+	FLDZ  
+	FSTP QWORD PTR [OPERANZI+EDX]
+	MOV CL, OPERATORI[EBX-1]
+	MOV OPERATORI[EBX], CL
+	JMP ET1
+	
+	
+	EOO:
+	mov AL, 0
+	cmp	OPERATORI[EBX], AL
+	JNE ET1
+	
+	
+	; Se parcurge sirul de operatori si operanzi pentru evaluarea adunarilor si scaderilor
+	STEP2:
+	XOR EAX, EAX
+	XOR EBX, EBX
+	XOR ECX, ECX
+	XOR EDX, EDX
+	
+	
+	ET2:
+	ADD EDX, 8
+	
+	mov AL, '+'
+	cmp	OPERATORI[EBX], AL
+	jne SCADERE
+	push DWORD PTR [OPERANZI+EDX+4]
+	push DWORD PTR [OPERANZI+EDX]
+	push DWORD PTR [OPERANZI+4]
+	push DWORD PTR [OPERANZI]
+	call ADUNA
+	FLD  REZ
+	FSTP OPERANZI
+	INC  EBX
+	jmp  ET2
+	
+	
+	SCADERE:
+	mov AL, '-'
+	cmp	OPERATORI[EBX], AL
+	jne GATA
+	push DWORD PTR [OPERANZI+EDX+4]
+	push DWORD PTR [OPERANZI+EDX]
+	push DWORD PTR [OPERANZI+4]
+	push DWORD PTR [OPERANZI]
+	call SCADE 
+	FLD  REZ
+	FSTP OPERANZI
+	INC EBX
+	jmp  ET2
+	
+	
+	; Afisarea rezultatului
+	GATA:
+	PUSH DWORD PTR [OPERANZI+4]
+	PUSH DWORD PTR [OPERANZI]
+	PUSH OFFSET FORMAT
+	CALL PRINTF
+	
+	FLD OPERANZI
+	FSTP REZ
+	
+	JMP RESTART
+	
+	
+	DONE:
+	push 0
+	call exit
+end start
